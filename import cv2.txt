@@ -1,0 +1,51 @@
+import cv2
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix
+from skimage.feature import hog, local_binary_pattern
+
+# Step 1: Load the FER2013 Dataset
+# Assuming you have downloaded the dataset and stored it in a folder called 'fer2013'
+data = np.genfromtxt('fer2013/fer2013.csv', delimiter=',', dtype=None, encoding='utf8', skip_header=1)
+labels = data[:, 0]
+pixels = data[:, 1]
+
+# Step 2: Preprocess the images - resize and normalize
+images = np.array([np.fromstring(pixel, dtype=int, sep=' ').reshape((48, 48)) for pixel in pixels])
+images = np.expand_dims(images, axis=-1)
+images = images / 255.0  # Normalize pixel values
+
+# Step 3: Split the dataset into train, test, and validation sets
+X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+
+# Step 4: Extract features using HOG and LBP
+def extract_hog_features(image):
+    hog_features, _ = hog(image, orientations=8, pixels_per_cell=(8, 8), cells_per_block=(2, 2), visualize=True)
+    return hog_features
+
+def extract_lbp_features(image):
+    lbp_features = local_binary_pattern(image, 8, 1, method='uniform')
+    return lbp_features
+
+X_train_hog = np.array([extract_hog_features(image) for image in X_train])
+X_train_lbp = np.array([extract_lbp_features(image) for image in X_train])
+
+# Step 5: Train an SVM classifier
+svm = SVC()
+svm.fit(X_train_hog, y_train)
+
+# Step 6: Evaluate the model
+X_test_hog = np.array([extract_hog_features(image) for image in X_test])
+y_pred = svm.predict(X_test_hog)
+accuracy = accuracy_score(y_test, y_pred)
+confusion_mat = confusion_matrix(y_test, y_pred)
+
+print("Accuracy: ", accuracy)
+print("Confusion Matrix: ")
+print(confusion_mat)
+
+# Step 7: Model Deployment - Web App and Mobile App
+# You can use frameworks like Flask or Django to develop a web app that takes image uploads and predicts emotions in real-time.
+# For the mobile app, you can use tools like TensorFlow Lite to deploy the model on-device using the device's camera.

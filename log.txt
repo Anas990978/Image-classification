@@ -1,0 +1,52 @@
+import numpy as np
+import pandas as pd
+import cv2
+from skimage.feature import hog, local_binary_pattern
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+# Load the FER2013 dataset
+data = pd.read_csv('fer2013.csv')
+pixels = data['pixels'].tolist()
+emotions = data['emotion']
+
+# Preprocess the images
+def preprocess(img):
+    img = np.array(img, dtype='uint8')
+    img = img.reshape(48, 48)
+    img = cv2.resize(img, (48, 48), interpolation=cv2.INTER_AREA)
+    img = (img - np.mean(img)) / np.std(img)
+    return img
+
+images = [preprocess(p.split(' ')) for p in pixels]
+
+# Extract HOG and LBP features
+def extract_features(img):
+    hog_features = hog(img)
+    lbp_features = local_binary_pattern(img, 8, 1, method='uniform').flatten()
+    return np.hstack((hog_features, lbp_features))
+
+features = np.array([extract_features(img) for img in images])
+
+# Split the data into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(features, emotions, test_size=0.2, random_state=42)
+
+# Normalize the features
+scaler = StandardScaler().fit(X_train)
+X_train_norm = scaler.transform(X_train)
+X_test_norm = scaler.transform(X_test)
+
+# Train SVM classifier
+svm = SVC(kernel='linear', probability=True)
+svm.fit(X_train_norm, y_train)
+
+# Evaluate the model
+y_pred = svm.predict(X_test_norm)
+accuracy = accuracy_score(y_test, y_pred)
+confusion = confusion_matrix(y_test, y_pred)
+
+print('Accuracy:', accuracy)
+print('Confusion Matrix:\n', confusion)
+
